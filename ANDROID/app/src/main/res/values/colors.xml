@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="fundo">#0A0E13</color>
+    <color name="topo">#0E131A</color>
+    <color name="botao">#1B242E</color>
+    <color name="borda">#202C3A</color>
+    <color name="texto">#E7EEF6</color>
+    <color name="fraco">#8595AC</color>
+    <color name="verde">#3FB950</color>
+    <color name="ambar">#E6AF3C</color>
+    <color name="vermelho">#F06464</color>
+    <color name="azul">#388BFD</color>
+</resources>

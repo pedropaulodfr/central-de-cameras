@@ -1,0 +1,22 @@
+[
+    {
+        "id": "icsee",
+        "nome": "iCSee",
+        "url": "rtsp://USUARIO:SENHA@192.168.0.5:554/onvif1",
+        "tcp": true
+    },
+    {
+        "id": "yoosee-cozinha",
+        "nome": "Yoosee Cozinha",
+        "url": "rtsp://127.0.0.1:0/onvif1",
+        "relay": "192.168.0.7:554",
+        "tcp": false
+    },
+    {
+        "id": "yoosee-sala",
+        "nome": "Yoosee Sala",
+        "url": "rtsp://127.0.0.1:0/onvif1",
+        "relay": "192.168.0.2:554",
+        "tcp": true
+    }
+]

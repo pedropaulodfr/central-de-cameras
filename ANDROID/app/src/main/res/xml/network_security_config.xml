@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    O gateway roda na rede local do usuário (http://192.168.x.x) e o endereço
+    pode mudar quando o roteador troca o IP do PC (DHCP). Fixar apenas alguns
+    IPs quebraria o app nesse caso, então o HTTP é liberado no geral.
+
+    Por que isso é aceitável aqui:
+      - toda requisição exige o token de acesso (Bearer), validado no servidor;
+      - o gateway só sobe com token, então sem token não há stream;
+      - para acesso pela internet o caminho recomendado é o Cloudflare Tunnel,
+        que já entrega tudo por HTTPS com certificado válido.
+
+    Se no futuro o app só for usado pela internet, troque base-config para
+    cleartextTrafficPermitted="false" e mantenha apenas os domínios locais.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

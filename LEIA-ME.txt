@@ -1,0 +1,116 @@
+================================================================
+  CENTRAL DE CAMERAS - instalador para Windows
+================================================================
+
+DOCUMENTACAO COMPLETA (para quem for mexer no projeto)
+-----------------------------------------------------
+  README.md        - visao geral, instalacao e uso
+  ARQUITETURA.md   - como o programa funciona por dentro
+  DECISOES.md      - o que ja foi decidido e por que
+  PARA-IA.md       - guia de continuacao para outra IA
+
+COMO INSTALAR EM OUTRO COMPUTADOR
+---------------------------------
+
+1. Copie esta pasta inteira para o outro PC
+   (os arquivos necessarios sao: CameraViewer.ps1, RtspRelay.cs,
+   cameras.json, Testar-Cameras.ps1, icone.ico, Instalador.ps1,
+   Instalar.bat)
+
+2. Instale o VLC media player (obrigatorio)
+   - Site: https://www.videolan.org/vlc/
+   - Na instalacao, mantenha marcada a opcao "ActiveX"
+   - Atalho: winget install VideoLAN.VLC
+
+3. Instale o ffmpeg (recomendado - necessario para GRAVAR)
+   - Site: https://www.gyan.dev/ffmpeg/builds/
+   - Atalho: winget install Gyan.FFmpeg
+   - Sem ffmpeg o programa ABRE e mostra as cameras, mas nao grava.
+
+4. Dê dois cliques em Instalar.bat
+
+5. Abra o atalho "Central de Cameras" na Area de Trabalho
+
+
+O QUE O INSTALADOR FAZ
+----------------------
+
+- Verifica Windows, PowerShell, .NET, VLC, ffmpeg e rede
+- Copia o programa para %LOCALAPPDATA%\CentralCameras
+- Cria o icone e o atalho na Area de Trabalho
+- Cria o atalho de inicializacao automatica
+- Cria a regra de firewall para o relé RTSP
+- Testa se a porta 554 das cameras responde
+- Mostra um relatorio com o que falta, se faltar algo
+
+
+AJUSTAR AS CAMERAS NO PC NOVO
+------------------------------
+
+Abra o arquivo cameras.json (em %LOCALAPPDATA%\CentralCameras) e
+ajuste os enderecos IP. Exemplo:
+
+    [
+        {
+            "nome": "iCSee",
+            "url": "rtsp://USUARIO:SENHA@192.168.0.5:554/onvif1",
+            "tcp": true
+        },
+        {
+            "nome": "Yoosee Cozinha",
+            "url": "rtsp://127.0.0.1:8611/onvif1",
+            "relay": "192.168.0.7:554"
+        },
+        {
+            "nome": "Yoosee Sala",
+            "url": "rtsp://127.0.0.1:8612/onvif1",
+            "relay": "192.168.0.2:554",
+            "recTcp": true
+        }
+    ]
+
+A URL das cameras Yoosee aponta para 127.0.0.1 de proposito: o
+programa cria um "ponte" local que corrige o defeito de
+autenticacao do firmware delas. O campo "relay" e o endereco real
+da camera.
+
+Se as cameras tiverem IPs diferentes no roteador novo, troque os
+numeros no campo "relay" e na URL da iCSee.
+
+OBS: o arquivo cameras.json guarda usuario e senha em texto puro.
+Se o PC for compartilhado, troque a senha ou apague o arquivo
+depois de configurar.
+
+
+OUTROS COMANDOS
+---------------
+
+Diagnostico sem instalar nada:
+    powershell -ExecutionPolicy Bypass -File .\Instalador.ps1 -SomenteDiagnostico
+
+Instalar em outra pasta:
+    powershell -ExecutionPolicy Bypass -File .\Instalador.ps1 -Pasta "D:\Apps\CentralCameras"
+
+Sem iniciar com o Windows:
+    powershell -ExecutionPolicy Bypass -File .\Instalador.ps1 -SemInicializacao
+
+Remover tudo:
+    Instalar.bat -Desinstalar
+
+
+DICAS IMPORTANTES
+-----------------
+
+- O PC precisa estar na MESMA rede Wi-Fi das cameras.
+- Desligue a "isolamento de clientes" (AP isolation) do roteador,
+  se estiver ativada, as cameras nao respondem.
+- As cameras Yoosee aceitam em media uma sessao RTSP por vez:
+  enquanto grava, a imagem ao vivo daquela camera pausa.
+- Para fechar o programa use o icone na bandeja do sistema >
+  Sair. Se matar o processo na forca, a camera pode ficar ocupada
+  por cerca de 60 segundos.
+- F5 na janela reconecta todas as cameras.
+- F11 coloca o programa em tela cheia (Esc sai). Em cada camera ha botoes Som/Mudo, Ampliar e Mover.
+- Clique duas vezes no nome da camera para tela cheia.
+
+================================================================

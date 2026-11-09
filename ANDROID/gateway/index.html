@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Central de Câmeras - Gateway</title>
+<style>
+  :root {
+    --fundo: #0A0E13;
+    --topo: #0E131A;
+    --botao: #1B242E;
+    --borda: #202C3A;
+    --texto: #E7EEF6;
+    --fraco: #8595AC;
+    --verde: #3FB950;
+    --ambar: #E6AF3C;
+    --vermelho: #F06464;
+    --azul: #388BFD;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 24px;
+    background: var(--fundo); color: var(--texto);
+    font-family: "Segoe UI", system-ui, sans-serif;
+    font-size: 15px; line-height: 1.5;
+  }
+  .container { max-width: 760px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--fraco); margin-bottom: 24px; font-size: 14px; }
+  .card {
+    background: var(--topo); border: 1px solid var(--borda);
+    border-radius: 12px; padding: 18px; margin-bottom: 16px;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 12px; color: var(--texto); }
+  label { display: block; font-size: 13px; color: var(--fraco); margin-bottom: 6px; }
+  input {
+    width: 100%; padding: 10px 12px; margin-bottom: 14px;
+    background: var(--botao); color: var(--texto);
+    border: 1px solid var(--borda); border-radius: 8px;
+    font-family: inherit; font-size: 14px;
+  }
+  button {
+    padding: 11px 20px; background: var(--botao); color: var(--texto);
+    border: 1px solid var(--borda); border-radius: 8px;
+    font-family: inherit; font-size: 14px; cursor: pointer; min-height: 44px;
+  }
+  button:hover { background: #24303D; }
+  button:active { background: var(--azul); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px,1fr)); gap: 12px; }
+  .cam { background: var(--botao); border: 1px solid var(--borda); border-radius: 10px; overflow: hidden; }
+  .cam video { width: 100%; display: block; background: #000; aspect-ratio: 16/9; }
+  .cam .info { padding: 10px 12px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--fraco); flex: 0 0 auto; }
+  .dot.on { background: var(--verde); }
+  .dot.err { background: var(--vermelho); }
+  .cam .nome { font-size: 14px; font-weight: 600; }
+  .status { color: var(--fraco); font-size: 13px; }
+  code {
+    background: var(--botao); padding: 2px 6px; border-radius: 4px;
+    font-family: Consolas, monospace; font-size: 13px; color: var(--ambar);
+  }
+  .url { word-break: break-all; font-size: 13px; color: var(--fraco); margin-top: 6px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Central de Câmeras</h1>
+  <div class="sub">Gateway remoto — visualize as câmeras de qualquer lugar.</div>
+
+  <div class="card">
+    <h2>Conectar</h2>
+    <label for="token">Token de acesso</label>
+    <input id="token" type="password" placeholder="cole o token definido no servidor">
+    <button id="btn">Conectar</button>
+    <div class="url" id="urlInfo"></div>
+  </div>
+
+  <div class="card">
+    <h2>Câmeras</h2>
+    <div class="grid" id="grid"><div class="status">Informe o token para carregar as câmeras.</div></div>
+  </div>
+</div>
+
+<script>
+const grid = document.getElementById('grid');
+const urlInfo = document.getElementById('urlInfo');
+let player = null;
+
+function qs(nome) { return new URLSearchParams(location.search).get(nome); }
+
+const tokenSalvo = localStorage.getItem('central_token') || qs('token') || '';
+if (tokenSalvo) { document.getElementById('token').value = tokenSalvo; carregar(); }
+
+document.getElementById('btn').onclick = () => {
+  localStorage.setItem('central_token', document.getElementById('token').value.trim());
+  carregar();
+};
+
+async function carregar() {
+  const token = document.getElementById('token').value.trim();
+  if (!token) return;
+  grid.innerHTML = '<div class="status">Carregando…</div>';
+  try {
+    const r = await fetch('/api/cameras', { headers: { 'Authorization': 'Bearer ' + token } });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const dados = await r.json();
+    desenhar(dados.cameras);
+    const base = location.origin;
+    urlInfo.innerHTML = 'URL para o app Android: <code>' + base + '</code>';
+  } catch (e) {
+    grid.innerHTML = '<div class="status" style="color:var(--vermelho)">Erro: ' + e.message + '</div>';
+  }
+}
+
+function desenhar(cams) {
+  grid.innerHTML = '';
+  for (const c of cams) {
+    const div = document.createElement('div');
+    div.className = 'cam';
+    const v = document.createElement('video');
+    v.autoplay = true; v.muted = true; v.controls = true; v.playsInline = true;
+    div.appendChild(v);
+    const info = document.createElement('div');
+    info.className = 'info';
+    const dot = document.createElement('span');
+    dot.className = 'dot ' + (c.status === 'erro' ? 'err' : 'on');
+    const nome = document.createElement('span');
+    nome.className = 'nome'; nome.textContent = c.nome;
+    info.appendChild(dot); info.appendChild(nome);
+    div.appendChild(info);
+    grid.appendChild(div);
+
+    // HLS nativo do navegador (Safari) ou via hls.js no Chrome
+    if (v.canPlayType('application/vnd.apple.mpegurl')) {
+      v.src = c.url + '?token=' + encodeURIComponent(document.getElementById('token').value.trim());
+      v.play().catch(() => {});
+    } else if (window.Hls) {
+      const hls = new Hls();
+      hls.loadSource(c.url + '?token=' + encodeURIComponent(document.getElementById('token').value.trim()));
+      hls.attachMedia(v);
+    }
+  }
+}
+</script>
+</body>
+</html>

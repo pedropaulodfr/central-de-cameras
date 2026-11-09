@@ -1,0 +1,18 @@
+[
+    {
+        "nome":  "iCSee",
+        "url":  "rtsp://usuario:senha@192.168.0.5:554/onvif1",
+        "tcp":  true
+    },
+    {
+        "nome":  "Yoosee Cozinha",
+        "url":  "rtsp://127.0.0.1:8611/onvif1",
+        "relay": "192.168.0.7:554"
+    },
+    {
+        "nome":  "Yoosee Sala",
+        "url":  "rtsp://127.0.0.1:8612/onvif1",
+        "relay": "192.168.0.2:554",
+        "recTcp": true
+    }
+]

@@ -1,0 +1,20 @@
+# Build do app
+/app/build/
+/build/
+/.gradle/
+/.kotlin/
+/local.properties
+
+# Gateway: arquivos gerados em tempo de execução
+/gateway/hls/
+/gateway/token.txt
+/gateway/*.log
+
+# Configuração real das câmeras (contém senhas) — o modelo é cameras.exemplo.json
+/gateway/cameras.json
+
+# Binário grande do túnel (baixar novamente se precisar)
+/gateway/cloudflared.exe
+
+# APK compilado (gerar com Compilar-APK.bat)
+/dist/

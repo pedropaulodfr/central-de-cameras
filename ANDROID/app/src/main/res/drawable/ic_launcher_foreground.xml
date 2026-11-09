@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Ícone do app: câmera de vigilância estilizada.
+    Zona segura do ícone adaptativo: 72x72 no centro de 108x108.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Corpo da câmera -->
+    <path
+        android:fillColor="#E7EEF6"
+        android:pathData="M32,44 h22 a6,6 0 0 1 6,6 v14 a6,6 0 0 1 -6,6 h-22 a6,6 0 0 1 -6,-6 v-14 a6,6 0 0 1 6,-6 z" />
+
+    <!-- Lente -->
+    <path
+        android:fillColor="#0E131A"
+        android:pathData="M39,57 a7,7 0 1,0 14,0 a7,7 0 1,0 -14,0 z" />
+
+    <!-- Brilho da lente -->
+    <path
+        android:fillColor="#388BFD"
+        android:pathData="M41,57 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0 z" />
+
+    <!-- Suporte -->
+    <path
+        android:fillColor="#8595AC"
+        android:pathData="M42,70 h6 v9 h-6 z" />
+
+    <!-- Base -->
+    <path
+        android:fillColor="#8595AC"
+        android:pathData="M36,79 h18 a3,3 0 0 1 0,6 h-18 a3,3 0 0 1 0,-6 z" />
+</vector>

@@ -1,0 +1,29 @@
+# Pastas criadas em tempo de execucao
+Temp/
+Gravacoes/
+Fotos/
+Buffer/
+Eventos/
+
+# Capturas de tela de teste
+*.png
+
+# Artefatos de build/teste
+Instalador.zip
+*.log
+
+# Sistema
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ---------------------------------------------------------------------------
+# SEGREDOS - nao versionar
+# ---------------------------------------------------------------------------
+# cameras.json guarda usuario e senha das cameras em texto puro.
+# O modelo publico e cameras.exemplo.json.
+cameras.json
+
+# Token de acesso do gateway
+token.txt
+ANDROID/gateway/token.txt
