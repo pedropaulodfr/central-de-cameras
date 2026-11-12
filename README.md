@@ -19,6 +19,7 @@ ser vistas em aplicativos separados, um por vez.
 - [Requisitos](#requisitos)
 - [Instalação](#instalação)
 - [Uso](#uso)
+- [Iniciar junto com o Windows](#iniciar-junto-com-o-windows)
 - [Arquivos do projeto](#arquivos-do-projeto)
 - [Configuração das câmeras](#configuração-das-câmeras)
 - [Arquitetura](#arquitetura)
@@ -136,11 +137,41 @@ O ícone na bandeja (próximo ao relógio) abre o menu:
 
 - **Abrir janela** — restaura a janela
 - **Gravar / Parar** — mesma ação do botão
+- **Iniciar com o Windows: ligado/desligado** — liga ou desliga a inicialização
+  automática com um clique (o texto mostra o estado atual)
 - **Sair** — encerra de verdade
 
 Minimizar a janela **não encerra o programa**: ele continua gravando e
 mantendo as câmeras ao vivo. Para sair de fato, use **Sair** no menu da
 bandeja.
+
+### Iniciar junto com o Windows
+
+A escolha é do usuário e pode ser mudada a qualquer momento, sem reinstalar:
+
+**Pelo menu da bandeja** — clique com o botão direito no ícone e escolha
+**Iniciar com o Windows**. O item alterna entre *ligado* e *desligado*.
+
+**Por linha de comando:**
+
+```powershell
+# ligar
+.\CameraViewer.ps1 -InicioAutomatico ligar
+
+# desligar
+.\CameraViewer.ps1 -InicioAutomatico desligar
+```
+
+Aceita também `true/false`, `on/off`, `1/0`, `sim/não`. **Sem o parâmetro**, o
+programa abre normalmente e não mexe na configuração atual.
+
+Por baixo, o estado vive no próprio atalho da pasta **Iniciar** do Windows
+(`%APPDATA%\Microsoft\Windows\Start Menu\Programs\Startup`): se o atalho
+existe, o programa abre com o Windows; se não existe, não abre. Não há arquivo
+de configuração paralelo, então não tem como ficar dessincronizado.
+
+> Na instalação, o `Instalador.ps1` cria o atalho por padrão. Para instalar
+> já sem inicialização automática, use `-SemInicializacao`.
 
 ### Atalhos de teclado
 

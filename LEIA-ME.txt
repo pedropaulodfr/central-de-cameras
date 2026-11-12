@@ -82,6 +82,34 @@ Se o PC for compartilhado, troque a senha ou apague o arquivo
 depois de configurar.
 
 
+INICIAR JUNTO COM O WINDOWS
+---------------------------
+
+O programa pode abrir sozinho quando o Windows liga. Voce escolhe:
+
+PELO PROPRIO PROGRAMA (mais facil)
+    1. Abra o Central de Cameras
+    2. Clique com o botao direito no icone da bandeja (perto do relogio)
+    3. Clique em "Iniciar com o Windows: ligado" para desligar
+       (ou em "desligado" para ligar)
+    O proprio item mostra o estado atual.
+
+POR LINHA DE COMANDO
+    Ligar:
+        powershell -ExecutionPolicy Bypass -File .\CameraViewer.ps1 -InicioAutomatico ligar
+
+    Desligar:
+        powershell -ExecutionPolicy Bypass -File .\CameraViewer.ps1 -InicioAutomatico desligar
+
+    Tambem aceita: true/false, on/off, 1/0, sim/nao.
+
+    Sem o parametro, o programa nao mexe na configuracao atual.
+
+O que muda por tras: um atalho e criado (ou removido) na pasta
+Iniciar do Windows. Se o atalho existe, o programa abre junto com o
+Windows; se nao existe, nao abre.
+
+
 OUTROS COMANDOS
 ---------------
 
@@ -91,7 +119,7 @@ Diagnostico sem instalar nada:
 Instalar em outra pasta:
     powershell -ExecutionPolicy Bypass -File .\Instalador.ps1 -Pasta "D:\Apps\CentralCameras"
 
-Sem iniciar com o Windows:
+Instalar sem criar a inicializacao automatica:
     powershell -ExecutionPolicy Bypass -File .\Instalador.ps1 -SemInicializacao
 
 Remover tudo:

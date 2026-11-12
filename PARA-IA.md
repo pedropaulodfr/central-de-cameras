@@ -186,6 +186,18 @@ A última câmera usa `SetColumnSpan($tile, 2)` para não deixar buraco.
 - [ ] `-c copy` mantido
 - [ ] Considerar que a câmera só aceita 1 sessão
 
+### Armadilhas já pagas
+
+| Sintoma | Causa | Correção |
+|---|---|---|
+| Texto aparece como `InicializaÇõÇœo` / `Câmeras` vira `CÃ¢meras` | O `.ps1` foi salvo **sem BOM UTF-8** e o PowerShell 5.1 lê como ANSI | Regravar com BOM: `[System.IO.File]::WriteAllBytes($p, ([byte[]](239,187,191)) + $bytes)` |
+| `-InicioAutomatico:$false` → *"Cannot convert value System.String to Nullable[Boolean]"* | Com `-File`, o PowerShell **não avalia** o `$false`: chega a string literal `$false` | Aceitar `[string]` e converter (`ligar`/`desligar`, `true`/`false`) |
+| Item de menu marcável não mostra o check | `ShowImageMargin = $false` também esconde a margem de check | Definir `ShowCheckMargin = $true` **e** refletir o estado no texto do item |
+
+> Ferramentas de edição automática **removem o BOM** com facilidade. Depois de
+> editar qualquer `.ps1` com acentos, confira os três primeiros bytes antes de
+> testar (`239,187,191`).
+
 ---
 
 ## 7. Como testar

@@ -13,7 +13,14 @@ param(
     [int]$SelfTestSeconds = 0,
     [string]$Screenshot = "",
     [switch]$AutoRecord,
-    [switch]$AutoSnapshot
+    [switch]$AutoSnapshot,
+    # Inicialização automática com o Windows.
+    #   (omitido)                          -> não mexe no que já está configurado
+    #   -InicioAutomatico ligar            -> liga
+    #   -InicioAutomatico desligar         -> desliga
+    # Aceita também true/false, on/off, 1/0, sim/não.
+    # Também pode ser alternado a qualquer momento pelo menu da bandeja.
+    [string]$InicioAutomatico = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -1185,6 +1192,111 @@ $form.Add_KeyDown({
     }
 })
 
+# ---- inicio automatico com o Windows --------------------------------------
+# O estado fica no proprio atalho da pasta Inicializar: se o atalho existe,
+# o Windows abre o programa; se nao existe, nao abre. Sem arquivo de
+# configuracao paralelo, entao nao tem como ficar dessincronizado.
+$script:NomesAtalhoInicio = @('Central de Cameras.lnk', 'Central de Câmeras.lnk')
+
+function Pasta-Inicio {
+    return [Environment]::GetFolderPath('Startup')
+}
+
+function Test-InicioAutomatico {
+    $pasta = Pasta-Inicio
+    if (-not $pasta) { return $false }
+    foreach ($n in $script:NomesAtalhoInicio) {
+        if (Test-Path (Join-Path $pasta $n)) { return $true }
+    }
+    return $false
+}
+
+function Remove-InicioAutomatico {
+    $pasta = Pasta-Inicio
+    if (-not $pasta) { return $false }
+    $removeu = $false
+    foreach ($n in $script:NomesAtalhoInicio) {
+        $caminho = Join-Path $pasta $n
+        if (Test-Path $caminho) {
+            Remove-Item $caminho -Force -ErrorAction SilentlyContinue
+            if (-not (Test-Path $caminho)) { $removeu = $true }
+        }
+    }
+    return $removeu
+}
+
+function Add-InicioAutomatico {
+    $pasta = Pasta-Inicio
+    if (-not $pasta) { return $false }
+    if (-not (Test-Path $pasta)) {
+        New-Item -ItemType Directory -Force -Path $pasta | Out-Null
+    }
+
+    try {
+        Remove-InicioAutomatico | Out-Null
+
+        # Prefere o Iniciar.vbs (abre sem janela de console). Se nao existir,
+        # aponta direto para o PowerShell com -WindowStyle Hidden.
+        $vbs = Join-Path $root 'Iniciar.vbs'
+        $script = Join-Path $root 'CameraViewer.ps1'
+        $ws = New-Object -ComObject WScript.Shell
+        $lnk = $ws.CreateShortcut((Join-Path $pasta $script:NomesAtalhoInicio[0]))
+
+        if (Test-Path $vbs) {
+            $lnk.TargetPath = Join-Path $env:SystemRoot 'System32\wscript.exe'
+            $lnk.Arguments = "`"$vbs`""
+        } else {
+            $lnk.TargetPath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+            $lnk.Arguments = "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$script`""
+        }
+
+        $lnk.WorkingDirectory = $root
+        $icone = Join-Path $root 'icone.ico'
+        if (Test-Path $icone) { $lnk.IconLocation = "$icone,0" }
+        $lnk.Description = 'Central de Câmeras'
+        $lnk.Save()
+
+        return (Test-Path (Join-Path $pasta $script:NomesAtalhoInicio[0]))
+    } catch {
+        Write-Warning "Inicialização automática: $($_.Exception.Message)"
+        return $false
+    }
+}
+
+function Set-InicioAutomatico([bool]$ativo) {
+    if ($ativo) { return (Add-InicioAutomatico) }
+    return (Remove-InicioAutomatico)
+}
+
+# Converte o valor do parâmetro em booleano. Devolve $null quando o usuário
+# não pediu nada (ou digitou algo que não reconhecemos).
+function Converte-InicioAutomatico([string]$valor) {
+    if ([string]::IsNullOrWhiteSpace($valor)) { return $null }
+    $t = $valor.Trim().ToLowerInvariant()
+    $t = $t.Trim([char[]]@('$', '"', "'"))
+    $ligados = @('true', '1', 'sim', 's', 'ligar', 'ligado', 'on', 'yes', 'y')
+    $desligados = @('false', '0', 'nao', 'não', 'n', 'desligar', 'desligado', 'off', 'no')
+    if ($ligados -contains $t) { return $true }
+    if ($desligados -contains $t) { return $false }
+    return $null
+}
+
+# Aplica o parametro de linha de comando, se informado.
+if (-not [string]::IsNullOrWhiteSpace($InicioAutomatico)) {
+    $pedido = Converte-InicioAutomatico $InicioAutomatico
+    if ($null -eq $pedido) {
+        Write-Warning "Valor inválido para -InicioAutomatico: '$InicioAutomatico'. Use ligar ou desligar."
+    } else {
+        $mudou = Set-InicioAutomatico $pedido
+        if ($mudou) {
+            $estado = if ($pedido) { 'ligada' } else { 'desligada' }
+            Write-Host "Inicialização automática $estado."
+        } else {
+            Write-Warning 'Não foi possível alterar a inicialização automática.'
+        }
+    }
+}
+
 # ---- bandeja --------------------------------------------------------------
 $script:Saindo = $false
 $script:Tray = $null
@@ -1197,13 +1309,29 @@ if (Test-Path $arquivoIcone) {
     $menu = New-Object System.Windows.Forms.ContextMenuStrip
     $menu.Renderer = New-Object TemaRenderer
     $menu.ShowImageMargin = $false
+    # Sem esta margem o marcador de check não é desenhado.
+    $menu.ShowCheckMargin = $true
     $menu.Font = [Tema]::Fonte(10, $false)
     $menu.BackColor = $corElevado
     $miAbrir = $menu.Items.Add('Abrir janela')
     $miGravar = $menu.Items.Add('Gravar / Parar')
     $menu.Items.Add('-') | Out-Null
+    # Item marcável: o texto mostra o estado atual (não depende só do check,
+    # que alguns temas desenham apagado) e o clique alterna.
+    $miInicio = $menu.Items.Add('Iniciar com o Windows')
+    $miInicio.CheckOnClick = $true
+    $miInicio.Checked = (Test-InicioAutomatico)
+    $menu.Items.Add('-') | Out-Null
     $miSair = $menu.Items.Add('Sair')
-    foreach ($mi in @($miAbrir, $miGravar, $miSair)) { $mi.Padding = New-Object System.Windows.Forms.Padding(6, 8, 6, 8) }
+    foreach ($mi in @($miAbrir, $miGravar, $miInicio, $miSair)) { $mi.Padding = New-Object System.Windows.Forms.Padding(6, 8, 6, 8) }
+
+    # Mantém o texto do item sempre coerente com o estado real do atalho.
+    $atualizarItemInicio = {
+        $ativo = Test-InicioAutomatico
+        $miInicio.Checked = $ativo
+        $miInicio.Text = if ($ativo) { 'Iniciar com o Windows: ligado' } else { 'Iniciar com o Windows: desligado' }
+    }
+    & $atualizarItemInicio
     $script:Tray.ContextMenuStrip = $menu
     $script:Tray.Visible = $true
 
@@ -1218,6 +1346,25 @@ if (Test-Path $arquivoIcone) {
     $miAbrir.Add_Click($mostrar)
     $script:Tray.Add_DoubleClick($mostrar)
     $miGravar.Add_Click({ $btnRec.PerformClick() })
+
+    $miInicio.Add_Click({
+        $quer = $miInicio.Checked
+        $ok = Set-InicioAutomatico $quer
+        if ($ok) {
+            & $atualizarItemInicio
+            $texto = if ($quer) {
+                'Agora o programa abre junto com o Windows.'
+            } else {
+                'O programa não vai mais abrir junto com o Windows.'
+            }
+            $script:Tray.ShowBalloonTip(3000, 'Central de Câmeras', $texto, [System.Windows.Forms.ToolTipIcon]::Info)
+        } else {
+            # Falhou: devolve o item para o estado real.
+            & $atualizarItemInicio
+            $script:Tray.ShowBalloonTip(4000, 'Central de Câmeras', 'Não foi possível alterar a inicialização automática.', [System.Windows.Forms.ToolTipIcon]::Warning)
+        }
+    })
+
     $miSair.Add_Click({ $script:Saindo = $true; $form.Close() })
 
     $form.Add_Resize({
