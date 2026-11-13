@@ -2,7 +2,7 @@
     {
         "id": "icsee",
         "nome": "iCSee",
-        "url": "rtsp://USUARIO:SENHA@192.168.0.5:554/onvif1",
+        "url": "rtsp://USUARIO:SENHA@192.168.0.11:554/onvif1",
         "tcp": true
     },
     {

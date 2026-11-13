@@ -43,7 +43,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import br.com.pedro.centralcameras.data.Camera
+import br.com.pedro.centralcameras.player.CameraItem
 import br.com.pedro.centralcameras.player.CameraVideo
 import br.com.pedro.centralcameras.player.EstadoVideo
 import br.com.pedro.centralcameras.ui.theme.Ambar
@@ -55,30 +55,30 @@ import br.com.pedro.centralcameras.ui.theme.Topo
 import br.com.pedro.centralcameras.ui.theme.Verde
 import br.com.pedro.centralcameras.ui.theme.Vermelho
 
-/**
- * Grade principal. Colunas adaptativas: no Galaxy J4 em retrato cabe uma
- * coluna, deixando cada câmera grande e legível; em paisagem viram duas.
- */
+/** Modo de visualização, para o cabeçalho mostrar de onde vem o vídeo. */
+enum class RotuloConexao { Direto, Remoto }
+
 @Composable
 fun TelaGrade(
-    cameras: List<Camera>,
-    urlDe: (Camera) -> String,
-    cabecalhos: Map<String, String>,
-    servidor: String,
-    aoAbrirCamera: (Camera) -> Unit,
+    cameras: List<CameraItem>,
+    rotulo: String,
+    modo: RotuloConexao,
+    versao: Int,
+    aoAbrirCamera: (CameraItem) -> Unit,
     aoAtualizar: () -> Unit,
     aoAbrirConfig: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxSize()) {
         Cabecalho(
             quantidade = cameras.size,
-            servidor = servidor,
+            subtitulo = rotulo,
+            modo = modo,
             aoAtualizar = aoAtualizar,
             aoAbrirConfig = aoAbrirConfig,
         )
 
         if (cameras.isEmpty()) {
-            Vazio()
+            Vazio(modo)
             return@Column
         }
 
@@ -88,21 +88,16 @@ fun TelaGrade(
                 start = 16.dp,
                 end = 16.dp,
                 top = 16.dp,
-                // Reserva espaço para a barra de navegação do sistema e para
-                // o gesto de voltar — sem isso o último tile fica coberto.
-                bottom = 16.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+                bottom = 16.dp +
+                    WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
             ),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize(),
         ) {
-            items(cameras, key = { it.id }) { cam ->
-                CardCamera(
-                    camera = cam,
-                    url = urlDe(cam),
-                    cabecalhos = cabecalhos,
-                    aoAbrir = { aoAbrirCamera(cam) },
-                )
+            // A versão entra na chave para que "Atualizar" recrie os players.
+            items(cameras, key = { "${it.id}-$versao" }) { cam ->
+                CardCamera(camera = cam, aoAbrir = { aoAbrirCamera(cam) })
             }
         }
     }
@@ -111,7 +106,8 @@ fun TelaGrade(
 @Composable
 private fun Cabecalho(
     quantidade: Int,
-    servidor: String,
+    subtitulo: String,
+    modo: RotuloConexao,
     aoAtualizar: () -> Unit,
     aoAbrirConfig: () -> Unit,
 ) {
@@ -130,21 +126,40 @@ private fun Cabecalho(
                     color = Texto,
                 )
                 Spacer(Modifier.height(2.dp))
-                Text(
-                    text = if (quantidade == 1) "1 câmera · $servidor"
-                    else "$quantidade câmeras · $servidor",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Fraco,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Etiqueta do modo: deixa claro se depende do PC ou não.
+                    Box(
+                        modifier = Modifier
+                            .background(
+                                if (modo == RotuloConexao.Direto) Color(0xFF12301C)
+                                else Color(0xFF10243D),
+                                RoundedCornerShape(6.dp),
+                            )
+                            .padding(horizontal = 7.dp, vertical = 2.dp),
+                    ) {
+                        Text(
+                            text = if (modo == RotuloConexao.Direto) "direto" else "remoto",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = if (modo == RotuloConexao.Direto) Verde else Azul,
+                        )
+                    }
+                    Spacer(Modifier.size(8.dp))
+                    Text(
+                        text = if (quantidade == 1) "1 câmera · $subtitulo"
+                        else "$quantidade câmeras · $subtitulo",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = Fraco,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
 
             IconButton(onClick = aoAtualizar, modifier = Modifier.size(48.dp)) {
                 Icon(Icons.Filled.Refresh, contentDescription = "Atualizar", tint = Fraco)
             }
             IconButton(onClick = aoAbrirConfig, modifier = Modifier.size(48.dp)) {
-                Icon(Icons.Filled.Settings, contentDescription = "Servidor", tint = Fraco)
+                Icon(Icons.Filled.Settings, contentDescription = "Configurações", tint = Fraco)
             }
         }
     }
@@ -152,15 +167,10 @@ private fun Cabecalho(
 
 @Composable
 private fun CardCamera(
-    camera: Camera,
-    url: String,
-    cabecalhos: Map<String, String>,
+    camera: CameraItem,
     aoAbrir: () -> Unit,
 ) {
-    // O status mostrado vem do PLAYER, não da API: a API é consultada a cada
-    // 10 s e pode dizer "instável" enquanto o vídeo corre normalmente.
     var estadoVideo by remember(camera.id) { mutableStateOf(EstadoVideo.Carregando) }
-    val aoVivo = estadoVideo == EstadoVideo.Reproduzindo
 
     Column(
         modifier = Modifier
@@ -171,16 +181,13 @@ private fun CardCamera(
             .clickable(onClick = aoAbrir),
     ) {
         CameraVideo(
-            url = url,
-            cabecalhos = cabecalhos,
+            fonte = camera.fonte,
             modifier = Modifier
                 .fillMaxWidth()
                 .aspectRatio(16f / 9f),
             aoMudarEstado = { estadoVideo = it },
         )
 
-        // Rodapé: ponto + nome + estado. O estado aparece por cor E por texto
-        // (nunca só cor), para quem não distingue as cores.
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -215,17 +222,20 @@ private fun CardCamera(
 }
 
 @Composable
-private fun Vazio() {
+private fun Vazio(modo: RotuloConexao) {
     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                "Nenhuma câmera configurada",
+                "Nenhuma câmera",
                 style = MaterialTheme.typography.titleMedium,
                 color = Texto,
             )
             Spacer(Modifier.height(6.dp))
             Text(
-                "Adicione câmeras no cameras.json do gateway.",
+                if (modo == RotuloConexao.Direto)
+                    "Toque na engrenagem para cadastrar as câmeras."
+                else
+                    "Toque na engrenagem e informe o endereço do gateway.",
                 style = MaterialTheme.typography.bodySmall,
                 color = Fraco,
             )

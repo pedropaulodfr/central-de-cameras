@@ -32,6 +32,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const crypto = require('crypto');
 const os = require('os');
+const { RtspRelay } = require('./relay');
 
 // ---------------------------------------------------------------------------
 // configuracao
@@ -90,52 +91,50 @@ carregarCameras();
 
 /**
  * Sobe um relay local para a camera e devolve a porta local.
- * Reusa o RtspRelayCli.exe do projeto desktop - o codigo do relay e o mesmo
- * nos dois apps.
+ *
+ * No Windows usa o RtspRelayCli.exe (o mesmo relay C# do app de PC, já
+ * testado com este firmware). Em Linux/Android (TV Box com Termux) o .exe
+ * não existe, então cai no relay.js, que é a mesma lógica em JavaScript.
  */
-function subirRelay(host, portaRemota) {
-  return new Promise((resolve, reject) => {
-    if (!fs.existsSync(CAMINHO_RELAY)) {
-      return reject(new Error(`RtspRelayCli.exe nao encontrado em ${CAMINHO_RELAY}`));
-    }
-    const proc = spawn(CAMINHO_RELAY, [host, String(portaRemota), '0'], {
-      windowsHide: true,
-    });
+async function subirRelay(host, portaRemota) {
+  const usaExe = process.platform === 'win32' && fs.existsSync(CAMINHO_RELAY);
 
-    let saida = '';
-    let resolvido = false;
+  if (usaExe) {
+    const porta = await new Promise((resolve, reject) => {
+      const proc = spawn(CAMINHO_RELAY, [host, String(portaRemota), '0'], { windowsHide: true });
+      let saida = '';
+      let resolvido = false;
 
-    proc.stdout.on('data', (d) => {
-      saida += d.toString();
-      // A primeira linha e a porta local efetiva.
-      const linhas = saida.split(/\r?\n/).filter((l) => l.trim().length > 0);
-      if (!resolvido && linhas.length > 0) {
-        const porta = parseInt(linhas[0].trim(), 10);
-        if (porta > 0) {
-          resolvido = true;
-          resolve({ proc, porta });
+      proc.stdout.on('data', (d) => {
+        saida += d.toString();
+        const linhas = saida.split(/\r?\n/).filter((l) => l.trim().length > 0);
+        if (!resolvido && linhas.length > 0) {
+          const p = parseInt(linhas[0].trim(), 10);
+          if (p > 0) { resolvido = true; resolve(p); }
         }
-      }
-    });
+      });
+      proc.stderr.on('data', (d) => console.error(`[relay ${host}] ${d.toString().trim()}`));
+      proc.on('error', (e) => { if (!resolvido) reject(e); });
+      proc.on('exit', (c) => { if (!resolvido) reject(new Error(`relay saiu com codigo ${c}`)); });
+      setTimeout(() => { if (!resolvido) reject(new Error('timeout ao subir relay')); }, 10000);
 
-    proc.stderr.on('data', (d) => {
-      console.error(`[relay ${host}] ${d.toString().trim()}`);
+      // Guarda o processo para encerrar junto.
+      subirRelay.ultimo = proc;
     });
+    return { proc: subirRelay.ultimo, porta };
+  }
 
-    proc.on('error', (e) => {
-      if (!resolvido) reject(e);
-    });
-
-    proc.on('exit', (code) => {
-      if (!resolvido) reject(new Error(`relay para ${host} saiu com codigo ${code}`));
-    });
-
-    setTimeout(() => {
-      if (!resolvido) reject(new Error(`timeout ao subir relay para ${host}`));
-    }, 10000);
-  });
+  const relay = new RtspRelay(host, portaRemota);
+  const porta = await relay.iniciar();
+  return { relay, porta };
 }
 
+/** Encerra um relay, seja o .exe (proc) ou o relay.js (relay). */
+function pararRelay(ref) {
+  if (!ref) return;
+  if (ref.relay) { try { ref.relay.parar(); } catch (e) { } }
+  else if (ref.proc) { try { ref.proc.kill(); } catch (e) { } }
+}
 // ---------------------------------------------------------------------------
 // processos ffmpeg (um por camera)
 // ---------------------------------------------------------------------------
@@ -229,7 +228,7 @@ async function iniciarStream(cam) {
     if (st) {
       st.status = 'erro';
       st.saida = stderr.slice(-500);
-      if (st.relay) { try { st.relay.proc.kill(); } catch (e) { } }
+      pararRelay(st.relay);
     }
   });
 
@@ -243,7 +242,7 @@ function pararStream(id) {
   const st = streams.get(id);
   if (!st) return;
   try { st.proc.kill(); } catch (e) { }
-  if (st.relay) { try { st.relay.proc.kill(); } catch (e) { } }
+  pararRelay(st.relay);
   streams.delete(id);
 }
 
@@ -480,7 +479,7 @@ process.on('exit', () => {
   for (const id of Array.from(streams.keys())) {
     const st = streams.get(id);
     try { st.proc.kill(); } catch (e) { }
-    if (st.relay) { try { st.relay.proc.kill(); } catch (e) { } }
+    pararRelay(st.relay);
   }
 });
 

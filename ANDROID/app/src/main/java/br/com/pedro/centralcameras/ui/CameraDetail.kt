@@ -3,7 +3,6 @@ package br.com.pedro.centralcameras.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -25,20 +23,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import br.com.pedro.centralcameras.data.Camera
+import br.com.pedro.centralcameras.player.CameraItem
 import br.com.pedro.centralcameras.player.CameraVideo
 import br.com.pedro.centralcameras.ui.theme.Fraco
 import br.com.pedro.centralcameras.ui.theme.Texto
 
 /**
  * Uma câmera em tela cheia. Toque em qualquer lugar para mostrar ou esconder
- * os controles — a barra some depois de alguns segundos para não poluir.
+ * os controles.
  */
 @Composable
 fun TelaCameraCheia(
-    camera: Camera,
-    url: String,
-    cabecalhos: Map<String, String>,
+    camera: CameraItem,
     aoVoltar: () -> Unit,
     controlesVisiveis: Boolean,
     aoAlternarControles: () -> Unit,
@@ -56,8 +52,7 @@ fun TelaCameraCheia(
             ),
     ) {
         CameraVideo(
-            url = url,
-            cabecalhos = cabecalhos,
+            fonte = camera.fonte,
             modifier = Modifier.fillMaxSize(),
             silencioso = false,
         )
@@ -71,10 +66,7 @@ fun TelaCameraCheia(
                     .align(Alignment.TopCenter),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                IconButton(
-                    onClick = aoVoltar,
-                    modifier = Modifier.size(48.dp),
-                ) {
+                IconButton(onClick = aoVoltar, modifier = Modifier.size(48.dp)) {
                     Icon(
                         Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Voltar",
@@ -89,7 +81,7 @@ fun TelaCameraCheia(
                         color = Texto,
                     )
                     Text(
-                        text = rotulo(camera),
+                        text = "ao vivo",
                         style = MaterialTheme.typography.bodySmall,
                         color = Fraco,
                     )
@@ -97,12 +89,4 @@ fun TelaCameraCheia(
             }
         }
     }
-}
-
-private fun rotulo(c: Camera): String = when (c.status) {
-    "ao vivo" -> "ao vivo"
-    "iniciando" -> "conectando"
-    "instavel" -> "conexão instável"
-    "erro", "parado" -> "sem sinal"
-    else -> c.status
 }

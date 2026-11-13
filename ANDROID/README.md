@@ -1,17 +1,23 @@
 # Central de Câmeras — App Android
 
-Aplicativo que mostra as mesmas câmeras do programa de PC, **de qualquer lugar**,
-inclusive fora da rede local.
+Aplicativo que mostra as mesmas câmeras do programa de PC. Tem **dois modos**:
+
+| Modo | Funciona | Precisa de quê |
+|---|---|---|
+| **Direto** (padrão) | Em casa, na mesma Wi-Fi das câmeras | **Nada** — nem PC, nem internet |
+| **Remoto** | Em qualquer lugar (4G, outra rede) | Gateway rodando no PC (ou num guardião 24h) |
+
+Troque de modo em **Configurações** (engrenagem), sem reinstalar.
 
 ---
 
 ## Índice
 
 - [Como funciona](#como-funciona)
+- [Modo direto — sem PC](#modo-direto--sem-pc)
+- [Modo remoto — de qualquer lugar](#modo-remoto--de-qualquer-lugar)
 - [Requisitos](#requisitos)
-- [Passo 1 — Preparar o PC (gateway)](#passo-1--preparar-o-pc-gateway)
-- [Passo 2 — Instalar o app no celular](#passo-2--instalar-o-app-no-celular)
-- [Passo 3 — Acesso de fora da rede](#passo-3--acesso-de-fora-da-rede)
+- [Instalar o app no celular](#instalar-o-app-no-celular)
 - [Usar o app](#usar-o-app)
 - [Solução de problemas](#solução-de-problemas)
 - [Compilar do zero](#compilar-do-zero)
@@ -23,39 +29,70 @@ inclusive fora da rede local.
 
 ## Como funciona
 
-O celular **não** fala RTSP com as câmeras. Ele fala HTTP com um **gateway**
-que roda no seu PC.
+### Modo direto (sem PC)
+
+O celular fala **RTSP** direto com as câmeras, na rede local.
 
 ```
-┌────────────────────┐          ┌──────────────────────────────┐
-│  CELULAR           │          │  PC (ligado, na rede)        │
-│                    │  HTTPS   │                              │
-│  App Android       │◀────────▶│  Gateway (Node.js)           │
-│  • grade           │          │   • API com token            │
-│  • tela cheia      │          │   • converte RTSP → HLS      │
-│  • HLS (ExoPlayer) │          │   • relay das Yoosee         │
-└────────────────────┘          └──────────────┬───────────────┘
-                                               │ RTSP 554
-                                      ┌────────▼────────┐
-                                      │  Câmeras        │
-                                      └─────────────────┘
+┌────────────────┐   RTSP 554    ┌──────────────┐
+│  CELULAR       │──────────────▶│  Câmera      │
+│  • relay local │               └──────────────┘
+│  • libVLC      │
+└────────────────┘
 ```
 
-Por que assim:
+As câmeras Yoosee têm firmware quebrado (recusam Digest correto), então o app
+sobe um **relay local em Kotlin** (porta em `127.0.0.1`) que injeta o
+cabeçalho aceito e corrige o `Transport`. O player aponta para o relay.
+
+O player do modo direto é o **libVLC** — o mesmo motor do app de PC. O RTSP do
+Media3 foi descartado porque tem um `NullPointerException` **fatal** quando o
+SDP do firmware é incompleto (as Yoosee anunciam H265 sem `sprop-vps`), o que
+derrubava o app inteiro.
+
+### Modo remoto (de qualquer lugar)
+
+O celular fala **HTTP/HLS** com um gateway que roda no PC.
+
+```
+┌────────────────┐  HTTPS   ┌──────────────────────┐  RTSP  ┌──────────┐
+│  CELULAR       │◀────────▶│  PC (gateway Node)   │───────▶│ Câmeras  │
+│  • HLS/Media3  │          │  • API com token     │        └──────────┘
+└────────────────┘          │  • RTSP → HLS        │
+                            │  • relay das Yoosee  │
+                            └──────────────────────┘
+```
+
+O vídeo é convertido para **H.264 720p** na GPU (AMD AMF), ~1,2 Mbps por
+câmera — leve para 4G e compatível com qualquer celular.
+
+### Por que dois modos
 
 | Alternativa | Problema |
 |---|---|
-| App falar RTSP direto | Fora da rede é impossível; e o firmware das Yoosee recusa autenticação padrão |
-| VPN no celular | Funciona, mas exige configurar VPN e expõe as câmeras a quem estiver nela |
-| **Gateway + HLS** | Funciona em qualquer rede, no 4G, sem abrir porta no roteador |
-
-O gateway usa o **mesmo código de relay** (`RtspRelay.cs`) do app de PC, então
-o contorno do defeito das Yoosee é idêntico nos dois programas.
-
-O vídeo é convertido para **H.264 720p** na GPU (AMD AMF), o que dá ~1,2 Mbps
-por câmera — leve o bastante para 4G e compatível com qualquer celular.
+| Só RTSP direto | Fora de casa é fisicamente impossível (as câmeras não têm porta aberta na internet) |
+| Só gateway | Obriga o PC a ficar ligado mesmo quando você está em casa |
+| **Os dois** | Em casa você não depende de nada; fora de casa usa o gateway |
 
 ---
+
+## Modo direto — sem PC
+
+**Não precisa de servidor, nem de internet.** Basta o celular estar na mesma
+rede Wi-Fi das câmeras.
+
+1. Abra o app (ele já inicia no modo direto)
+2. Toque na engrenagem
+3. Confira o **IP de cada câmera** (mudam quando o roteador troca)
+4. Para a iCSee, informe **usuário e senha**
+5. Para as Yoosee, deixe **"Autenticação quebrada (Yoosee)"** ligado
+
+**Custo:** o APK fica maior (~60 MB por arquitetura) porque embute o libVLC.
+Vale a pena: é o que faz funcionar sem depender de nada.
+
+---
+
+## Modo remoto — de qualquer lugar
 
 ## Requisitos
 
@@ -73,7 +110,7 @@ por câmera — leve o bastante para 4G e compatível com qualquer celular.
 
 ---
 
-## Passo 1 — Preparar o PC (gateway)
+## Preparar o PC (gateway)
 
 1. Abra a pasta `ANDROID\gateway`
 2. Dê dois cliques em **`Iniciar-Gateway.bat`**
@@ -96,7 +133,7 @@ e não muda nas próximas vezes.
 
 ---
 
-## Passo 2 — Instalar o app no celular
+## Instalar o app no celular
 
 ### Opção A — pelo cabo USB (mais rápido)
 
@@ -116,14 +153,14 @@ adb install -r D:\Documentos\projects\central-de-cameras\ANDROID\dist\CentralCam
 
 1. Abra **Central de Câmeras**
 2. **Endereço do servidor:** o que o gateway mostrou (`http://192.168.0.3:8080`)
-3. **Token de acesso:** o token do passo 1
+3. **Token de acesso:** o token mostrado pelo gateway
 4. Toque em **Conectar**
 
 As três câmeras aparecem na grade, ao vivo.
 
 ---
 
-## Passo 3 — Acesso de fora da rede
+## Acesso de fora da rede
 
 Para ver as câmeras no 4G, num Wi-Fi de outro lugar ou viajando, é preciso
 expor o gateway na internet. O roteador não abre porta (e muitas operadoras

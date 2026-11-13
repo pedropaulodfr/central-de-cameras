@@ -16,8 +16,21 @@ android {
         // Galaxy J4 Core roda Android 8.1 (API 27).
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "2.0"
+
+        // As arquiteturas ficam definidas em `splits`, abaixo. Não usar
+        // ndk.abiFilters junto com splits: o Gradle recusa a combinação.
+    }
+
+    splits {
+        abi {
+            isEnable = true
+            reset()
+            // x86_64 é só para rodar no emulador durante o desenvolvimento.
+            include("armeabi-v7a", "arm64-v8a", "x86_64")
+            isUniversalApk = false
+        }
     }
 
     buildTypes {
@@ -62,10 +75,16 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.11.0")
     implementation("com.squareup.okhttp3:okhttp:5.5.1")
 
-    // Player HLS
+    // Player HLS (modo remoto, via gateway no PC)
     implementation("androidx.media3:media3-exoplayer:1.11.1")
     implementation("androidx.media3:media3-exoplayer-hls:1.11.1")
     implementation("androidx.media3:media3-ui:1.11.1")
+
+    // Player RTSP do modo direto.
+    // Usamos o libVLC (o mesmo player do app de PC) porque o RTSP do Media3
+    // tem um NullPointerException fatal quando o SDP do firmware é incompleto
+    // (caso das Yoosee que anunciam H265 sem sprop-vps) — ele derruba o app.
+    implementation("org.videolan.android:libvlc-all:3.6.5")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

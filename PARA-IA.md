@@ -376,23 +376,40 @@ seção 6.
 
 ## 12. App Android (pasta `ANDROID/`)
 
-### Arquitetura em uma frase
+### Dois modos (importante)
 
-O celular **não fala RTSP**. Um **gateway Node.js** roda no PC, converte as
-câmeras para **HLS** e entrega por HTTP com token; o app Android só consome
-HLS via ExoPlayer.
+O app tem **dois modos independentes**, trocáveis na tela de Configurações:
+
+| Modo | Como | Precisa de |
+|---|---|---|
+| **Direto** (padrão) | App fala RTSP com a câmera na LAN, com relay local em Kotlin | Nada. Nem PC, nem internet |
+| **Remoto** | App fala HLS com o gateway no PC | Gateway ligado |
 
 ```
-Celular ──HTTPS──▶ Cloudflare Tunnel ──▶ PC (gateway) ──RTSP──▶ Câmeras
+DIRETO:  App ──RTSP──▶ Câmera            (só em casa)
+REMOTO:  App ──HTTPS──▶ Cloudflare ──▶ PC (gateway) ──RTSP──▶ Câmeras
 ```
+
+**Não existe** acesso de fora de casa sem algo ligado na rede local — as
+câmeras não têm porta aberta na internet (o provedor usa CGNAT). Para resolver
+isso sem PC, o plano é usar um **TV Box** como guardião: ver
+[`ANDROID/TV-BOX.md`](ANDROID/TV-BOX.md).
 
 ### Componentes
 
 | Peça | Tecnologia | Onde |
 |---|---|---|
-| Gateway | Node.js + ffmpeg + `RtspRelayCli.exe` | `ANDROID/gateway/` |
-| Túnel | `cloudflared` (quick tunnel) | `ANDROID/gateway/cloudflared.exe` |
-| App | Kotlin + Compose + Media3 ExoPlayer | `ANDROID/app/` |
+| Gateway | Node.js + ffmpeg | `ANDROID/gateway/` |
+| Relay (Windows) | `RtspRelayCli.exe` (compilado do `RtspRelay.cs`) | `ANDROID/gateway/` |
+| Relay (Linux/TV Box) | `relay.js` — mesma lógica em JavaScript | `ANDROID/gateway/relay.js` |
+| Túnel | `cloudflared` | `ANDROID/gateway/cloudflared.exe` |
+| App | Kotlin + Compose | `ANDROID/app/` |
+| Player remoto | Media3 ExoPlayer (HLS) | `player/CameraVideo.kt` |
+| Player direto | **libVLC** | `player/VlcVideo.kt` |
+| Relay no app | `RtspRelayLocal.kt` (porta do `.cs` para Kotlin) | `player/` |
+
+> O `server.js` escolhe o relay sozinho: no Windows usa o `.exe`; em
+> Linux/Android usa o `relay.js`.
 
 ### Detalhes que importam
 
@@ -417,6 +434,12 @@ Celular ──HTTPS──▶ Cloudflare Tunnel ──▶ PC (gateway) ──RTSP
 | `calculateBottomPadding` | É membro de `PaddingValues`, **não** precisa de import. |
 | Barra de navegação clara no Android 8.1 | `enableEdgeToEdge()` deixa a barra translúcida; pintar `navigationBarColor` explicitamente resolve. |
 | Status da API ≠ status do vídeo | A API é consultada a cada 10 s; o tile deve mostrar o estado do **player**, não o da API. |
+| **RTSP do Media3 é fatal** | Com SDP incompleto (Yoosee anuncia H265 sem `sprop-vps`) ele lança `NullPointerException` em `RtspMediaPeriod.onPlaybackStarted` **e derruba o app**. Não há try/catch que salve (é outra thread). Por isso o modo direto usa **libVLC**. |
+| `ndk.abiFilters` + `splits` | O Gradle **recusa** a combinação. Escolha um: use só `splits { abi { … } }`. |
+| libVLC engorda o APK | ~60 MB por arquitetura. Por isso `splits` gera um APK por ABI (armv7, arm64, x86_64 para emulador). |
+| Senha em texto claro | `KeyboardType.Password` **não** mascara. Precisa de `visualTransformation = PasswordVisualTransformation()`. |
+| `pipe` + pipeline manual | No `relay.js`, usar `cliente.pipe(camera)` **junto** com o pipeline duplica os bytes e a câmera responde `400`. Use só o pipeline. |
+| `uiautomator dump` mostra `content-desc` vazio | O Compose não expõe os `contentDescription` de forma confiável no Android 8.1; use os `bounds` dos nós clicáveis. |
 | `bash` não existe | Todo o ambiente é PowerShell + `.bat`. |
 
 ### Testar
